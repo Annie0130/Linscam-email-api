@@ -1,39 +1,33 @@
+import nodemailer from 'nodemailer';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  const RESEND_KEY = process.env.RESEND_API_KEY;
-  if (!RESEND_KEY) return res.status(500).json({ error: 'Missing API key' });
 
   try {
     const { to, cc, subject, html } = req.body;
     if (!to || !subject || !html) return res.status(400).json({ error: 'Missing fields' });
 
-    const payload = {
-      from: '林相攝影 <onboarding@resend.dev>',
-      to: [to],
-      subject,
-      html,
-    };
-    if (cc) payload.cc = [cc];
-
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_KEY}`,
-        'Content-Type': 'application/json',
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_PASS,
       },
-      body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
-    if (!response.ok) return res.status(400).json({ error: data });
-    return res.status(200).json({ success: true, id: data.id });
+    await transporter.sendMail({
+      from: `林相攝影 <${process.env.GMAIL_USER}>`,
+      to,
+      cc: cc || 'linscamerastore@gmail.com',
+      subject,
+      html,
+    });
 
+    return res.status(200).json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
